@@ -4,6 +4,9 @@ import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 
+
+import { PROFANITY_LIST } from './wordsToFilter'
+
 import ProfanityFilter from './ProfanityFilter'
 
 function OldApp() {
@@ -125,7 +128,7 @@ function OldApp() {
 function App(){
   const myChoice:number = 2;
 
-  return myChoice === 1? <OldApp/> : <ProfanityFilter/>
+  return myChoice === 1? <OldApp/> : <ProfanityFilter wordsToFilter={PROFANITY_LIST}/>
 }
 
 export default App

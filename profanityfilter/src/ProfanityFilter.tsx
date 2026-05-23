@@ -1,16 +1,10 @@
 import { useState, useCallback } from "react";
 
-const PROFANITY_LIST = [
-  "damn", "hell", "crap", "ass", "bastard", "bitch", "shit", "fuck",
-  "piss", "dick", "cock", "pussy", "cunt", "asshole", "motherfucker",
-  "bullshit", "jackass", "dumbass", "shithead", "fuckhead", "fucked",
-  "fucking", "fucker", "fucks", "shits", "shitting", "shitty", "asses",
-  "bitches", "dicks", "cocks", "pussies", "cunts", "assholes"
-];
 
-function censorWord(word: string) {
+
+function censorWord(word: string, profanityList: string[]) {
   const lower = word.toLowerCase();
-  for (const profane of PROFANITY_LIST) {
+  for (const profane of profanityList) {
     if (lower === profane) {
       return word[0] + "*".repeat(word.length - 2) + word[word.length - 1];
     }
@@ -18,11 +12,11 @@ function censorWord(word: string) {
   return null;
 }
 
-function filterText(text: string) {
+function filterText(text: string, profanityList: string[]) {
   if (!text) return { output: "", count: 0 };
   let count = 0;
   const result = text.replace(/\b[\w']+\b/g, (match) => {
-    const censored = censorWord(match);
+    const censored = censorWord(match, profanityList);
     if (censored) { count++; return censored; }
     return match;
   });
@@ -41,12 +35,15 @@ function getHighlightedSegments(original: string, filtered:
   }));
 }
 
-export default function ProfanityFilter() {
+export default function ProfanityFilter( props: {wordsToFilter: string[]}) {
   const [input, setInput] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const { output, count } = filterText(input);
+  const {wordsToFilter} = props;  
+  
+  const { output, count } = filterText(input, wordsToFilter);
   const segments = getHighlightedSegments(input, output);
+
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(output);
