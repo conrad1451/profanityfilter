@@ -1,5 +1,8 @@
+// svgcleaner/src/SVGCleaner.tsx
+
 import { useState, useCallback } from "react";
-import { transformSVG, TransformLog } from "./TransformSVG";
+import type { TransformLog } from "./types";
+import { transformSVG } from "./TransformSVG";
 import "./App.css";
 
 const EXAMPLE = `<svg id="sunflowerFieldWinds" style="width: 30px; height: 30px; display: none">

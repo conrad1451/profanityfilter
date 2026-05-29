@@ -1,12 +1,6 @@
-export interface TransformLog {
-  status: "ok" | "skip" | "error";
-  message: string;
-}
+// svgcleaner/src/TransformSVG.ts
 
-export interface TransformResult {
-  svg: string;
-  log: TransformLog[];
-}
+import type { TransformLog, TransformResult } from "./types";
 
 /** SVG presentation attributes that can be lifted out of style="..." */
 const PROMOTABLE_ATTRS = new Set([
