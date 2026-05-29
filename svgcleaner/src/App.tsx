@@ -1,11 +1,42 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useCallback } from "react";
 
-function App() {
-  const [count, setCount] = useState(0)
+import reactLogo from "./assets/react.svg";
+import viteLogo from "./assets/vite.svg";
+import heroImg from "./assets/hero.png";
+import "./App.css";
+
+import SVGCleaner from "./SVGCleaner";
+
+import {
+  Button,
+  Box,
+  Typography,
+  // FormControl,
+  // Select,
+  // MenuItem,
+  // useTheme,
+  // Paper,
+} from "@mui/material";
+
+// --- Interfaces ---
+export interface NavigationButtonsProps {
+  navigate: (path: string) => void;
+}
+const NavigationButtons: React.FC<NavigationButtonsProps> = ({ navigate }) => {
+  return (
+    <Box sx={{ display: "flex", gap: 2, justifyContent: "center", p: 4 }}>
+      <Button variant="contained" onClick={() => navigate("/orig")}>
+        Go to original page
+      </Button>
+      <Button variant="contained" onClick={() => navigate("/svgcleaner")}>
+        Go to SVG Cleaner
+      </Button>
+    </Box>
+  );
+};
+
+function OldApp() {
+  const [count, setCount] = useState(0);
 
   return (
     <>
@@ -116,7 +147,74 @@ function App() {
       <div className="ticks"></div>
       <section id="spacer"></section>
     </>
-  )
+  );
 }
 
-export default App
+function App() {
+  // const [chosenDate, setChosenDate] = useState<string>("");
+  const [currentPath, setCurrentPath] = useState<string>("/");
+
+  // Function to simulate navigation (replaces useNavigate)
+  const navigate = useCallback((path: string) => {
+    setCurrentPath(path);
+  }, []);
+
+  let content;
+
+  switch (currentPath) {
+    case "/orig":
+      content = <OldApp />;
+      break;
+    case "/svgcleaner":
+      content = <SVGCleaner />;
+      break;
+    case "/":
+    default:
+      content = (
+        <Box sx={{ p: 4, textAlign: "center" }}>
+          <Typography variant="h3" gutterBottom>
+            Welcome
+          </Typography>
+          <NavigationButtons navigate={navigate} />
+          <p>HI</p>
+        </Box>
+      );
+      break;
+  }
+
+  return (
+    // CHQ: Gemini AI modified to apply flexbox to the outer container to center the inner container.
+
+    <Box
+      sx={{
+        fontFamily: "Inter",
+        bgcolor: "#f4f7f9",
+        minHeight: "100vh",
+        minWidth: "100vw",
+        display: "flex", // Enable flex container
+        justifyContent: "center", // Center content horizontally
+        // alignItems: 'flex-start', // (Optional) Keep content aligned to the top
+      }}
+    >
+      <Box
+        sx={{
+          width: "100%", // Ensure it uses max width available up to 800px
+          pt: 4,
+        }}
+      >
+        {currentPath !== "/" && (
+          <Button
+            onClick={() => navigate("/")}
+            sx={{ mb: 2, ml: 2 }}
+            variant="text"
+          >
+            ← Back to Home
+          </Button>
+        )}
+        {content}
+      </Box>
+    </Box>
+  );
+}
+
+export default App;
