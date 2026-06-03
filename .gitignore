@@ -1,5 +1,6 @@
 
 tree-generator.ps1
+svgcleaning.ps1
 project-tree.txt
 
 svgcleaner/oldtsconfig.txt

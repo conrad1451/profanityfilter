@@ -5,7 +5,8 @@ import viteLogo from "./assets/vite.svg";
 import heroImg from "./assets/hero.png";
 import "./App.css";
 
-import SVGCleaner from "./SVGCleaner";
+// import SVGCleaner from "./SVGCleaner";
+import { SVGBatchCleaner } from "./SVGCleaner";
 
 import {
   Button,
@@ -166,7 +167,8 @@ function App() {
       content = <OldApp />;
       break;
     case "/svgcleaner":
-      content = <SVGCleaner />;
+      // content = <SVGCleaner />;
+      content = <SVGBatchCleaner />;
       break;
     case "/":
     default:

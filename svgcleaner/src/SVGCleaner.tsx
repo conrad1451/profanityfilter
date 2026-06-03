@@ -1,9 +1,15 @@
 // svgcleaner/src/SVGCleaner.tsx
 
-import { useState, useCallback } from "react";
-import type { TransformLog } from "./types";
+import { useState, useCallback, useRef } from "react";
+
+import type { TransformLog, LogStatus, FileResult } from "./types";
 import { transformSVG } from "./TransformSVG";
 import "./App.css";
+
+import { downloadBlob } from "./utils/downloadBlob";
+import { getSvgId } from "./utils/getSvgId";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 const EXAMPLE = `<svg id="sunflowerFieldWinds" style="width: 30px; height: 30px; display: none">
   <rect width="30" height="30" fill="rgb(230,230,255)"></rect>
@@ -29,7 +35,7 @@ function LogLine({ entry }: { entry: TransformLog }) {
   );
 }
 
-export default function SVGCleaner() {
+export function SVGCleaner() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [log, setLog] = useState<TransformLog[]>([]);
@@ -144,6 +150,571 @@ export default function SVGCleaner() {
           )}
         </section>
       </main>
+    </div>
+  );
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StatusIcon({ status }: { status: LogStatus }) {
+  const icons: Record<LogStatus, string> = {
+    ok: "ti-circle-check",
+    error: "ti-circle-x",
+    skip: "ti-minus",
+  };
+  const colors: Record<LogStatus, string> = {
+    ok: "var(--color-text-success)",
+    error: "var(--color-text-danger)",
+    skip: "var(--color-text-secondary)",
+  };
+  return (
+    <i
+      className={`ti ${icons[status]}`}
+      style={{
+        color: colors[status],
+        fontSize: 14,
+        marginRight: 6,
+        flexShrink: 0,
+      }}
+      aria-hidden="true"
+    />
+  );
+}
+
+function TheHeader(props: { hasError: boolean; result: FileResult }) {
+  const { hasError, result } = props;
+  return (
+    <div
+      style={{
+        padding: "12px 16px",
+        borderBottom: "0.5px solid var(--color-border-tertiary)",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <i
+        className={`ti ${hasError ? "ti-file-x" : "ti-file-check"}`}
+        style={{
+          fontSize: 18,
+          color: hasError
+            ? "var(--color-text-danger)"
+            : "var(--color-text-success)",
+          flexShrink: 0,
+        }}
+        aria-hidden="true"
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            margin: 0,
+            fontWeight: 500,
+            fontSize: 14,
+            color: "var(--color-text-primary)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {result.uploadedName}
+        </p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: "var(--color-text-secondary)",
+          }}
+        >
+          {hasError ? "Failed" : `id: ${result.svgId ?? "no id found"}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function DownloadColumns(props: { baseName: string; result: FileResult }) {
+  const { baseName, result } = props;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+      <div
+        style={{
+          padding: "12px 16px",
+          borderRight: "0.5px solid var(--color-border-tertiary)",
+        }}
+      >
+        <p
+          style={{
+            margin: "0 0 8px",
+            fontSize: 11,
+            fontWeight: 500,
+            color: "var(--color-text-secondary)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+          }}
+        >
+          Text file
+        </p>
+        <button
+          onClick={() =>
+            downloadBlob(result.svg, `${baseName}.txt`, "text/plain")
+          }
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            padding: "8px 12px",
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          <i
+            className="ti ti-download"
+            style={{ fontSize: 15 }}
+            aria-hidden="true"
+          />
+          {baseName}.txt
+        </button>
+      </div>
+      <div style={{ padding: "12px 16px" }}>
+        <p
+          style={{
+            margin: "0 0 8px",
+            fontSize: 11,
+            fontWeight: 500,
+            color: "var(--color-text-secondary)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+          }}
+        >
+          SVG file
+        </p>
+        <button
+          onClick={() =>
+            downloadBlob(result.svg, `${baseName}.svg`, "image/svg+xml")
+          }
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            padding: "8px 12px",
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          <i
+            className="ti ti-download"
+            style={{ fontSize: 15 }}
+            aria-hidden="true"
+          />
+          {baseName}.svg
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LogToggle(props: {
+  result: FileResult;
+  logOpen: boolean;
+  setLogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}) {
+  const { result, logOpen, setLogOpen } = props;
+
+  return (
+    <div style={{ borderTop: "0.5px solid var(--color-border-tertiary)" }}>
+      <button
+        onClick={() => setLogOpen((v) => !v)}
+        style={{
+          width: "100%",
+          padding: "8px 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 12,
+          color: "var(--color-text-secondary)",
+          cursor: "pointer",
+          background: "transparent",
+          border: "none",
+          textAlign: "left",
+        }}
+      >
+        <i
+          className={`ti ${logOpen ? "ti-chevron-up" : "ti-chevron-down"}`}
+          style={{ fontSize: 13 }}
+          aria-hidden="true"
+        />
+        {result.log.length} log {result.log.length === 1 ? "entry" : "entries"}
+      </button>
+      {logOpen && (
+        <div
+          style={{
+            padding: "0 16px 12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+          }}
+        >
+          {result.log.map((entry, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                fontSize: 12,
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              <StatusIcon status={entry.status} />
+              <span>{entry.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FileResultCard({ result }: { result: FileResult }) {
+  const [logOpen, setLogOpen] = useState(false);
+  const hasError = result.log.some((l) => l.status === "error");
+  const baseName = result.svgId ?? result.uploadedName;
+
+  return (
+    <div
+      style={{
+        background: "var(--color-background-primary)",
+        border: `0.5px solid ${hasError ? "var(--color-border-danger)" : "var(--color-border-tertiary)"}`,
+        borderRadius: "var(--border-radius-lg)",
+        overflow: "hidden",
+      }}
+    >
+      <TheHeader hasError={hasError} result={result} />
+
+      {!hasError && <DownloadColumns baseName={baseName} result={result} />}
+
+      <LogToggle result={result} logOpen={logOpen} setLogOpen={setLogOpen} />
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function SVGBatchCleaner() {
+  // export default function SVGBatchCleaner() {
+  const [results, setResults] = useState<FileResult[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const processFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const processed = await Promise.all(
+      fileArray.map(async (file): Promise<FileResult> => {
+        const text = await file.text();
+        const trimmed = text.trim();
+        if (!trimmed.includes("<svg")) {
+          return {
+            uploadedName: file.name,
+            svgId: null,
+            svg: "",
+            log: [
+              {
+                status: "error",
+                message: "File does not appear to contain an <svg> tag.",
+              },
+            ],
+          };
+        }
+        const result = transformSVG(trimmed);
+        const svgId = result.svg ? getSvgId(result.svg) : null;
+        return {
+          uploadedName: file.name.replace(/\.[^.]+$/, ""),
+          svgId,
+          svg: result.svg,
+          log: result.log,
+        };
+      }),
+    );
+    setResults((prev) => [...prev, ...processed]);
+  }, []);
+
+  const onFiles = useCallback(
+    (files: FileList | File[]) => {
+      const accepted = Array.from(files).filter(
+        (f) =>
+          f.name.endsWith(".txt") ||
+          f.name.endsWith(".svg") ||
+          f.type === "text/plain" ||
+          f.type === "image/svg+xml",
+      );
+      if (accepted.length === 0) {
+        alert("Please upload .txt or .svg files containing SVG markup.");
+        return;
+      }
+      processFiles(accepted);
+    },
+    [processFiles],
+  );
+
+  const onDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setDragOver(false);
+      onFiles(e.dataTransfer.files);
+    },
+    [onFiles],
+  );
+
+  const successResults = results.filter(
+    (r) => r.svg && !r.log.some((l) => l.status === "error"),
+  );
+  const downloadAll = useCallback(() => {
+    successResults.forEach((r) => {
+      const baseName = r.svgId ?? r.uploadedName;
+      downloadBlob(r.svg, `${baseName}.txt`, "text/plain");
+      downloadBlob(r.svg, `${baseName}.svg`, "image/svg+xml");
+    });
+  }, [successResults]);
+
+  return (
+    <div style={{ padding: "2rem 1.5rem", maxWidth: 720, margin: "0 auto" }}>
+      <div style={{ marginBottom: "2rem" }}>
+        <h1
+          style={{
+            margin: "0 0 4px",
+            fontSize: 22,
+            fontWeight: 500,
+            color: "var(--color-text-primary)",
+          }}
+        >
+          SVG batch cleaner
+        </h1>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 14,
+            color: "var(--color-text-secondary)",
+          }}
+        >
+          Upload multiple .txt or .svg files — each is validated, transformed,
+          and available to download.
+        </p>
+      </div>
+
+      {/* Drop zone */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+        onClick={() => fileInputRef.current?.click()}
+        style={{
+          border: `1.5px dashed ${dragOver ? "var(--color-border-info)" : "var(--color-border-secondary)"}`,
+          borderRadius: "var(--border-radius-lg)",
+          padding: "2.5rem 1.5rem",
+          textAlign: "center",
+          cursor: "pointer",
+          background: dragOver
+            ? "var(--color-background-info)"
+            : "var(--color-background-secondary)",
+          transition: "background 0.15s, border-color 0.15s",
+          marginBottom: "1.5rem",
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload SVG files"
+        onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+      >
+        <i
+          className="ti ti-upload"
+          style={{
+            fontSize: 28,
+            color: "var(--color-text-secondary)",
+            display: "block",
+            marginBottom: 8,
+          }}
+          aria-hidden="true"
+        />
+        <p
+          style={{
+            margin: "0 0 4px",
+            fontSize: 14,
+            fontWeight: 500,
+            color: "var(--color-text-primary)",
+          }}
+        >
+          Drop files here or click to browse
+        </p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: "var(--color-text-secondary)",
+          }}
+        >
+          .txt or .svg files containing SVG markup · multiple files supported
+        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.svg,text/plain,image/svg+xml"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => {
+            if (e.target.files?.length) onFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      {/* Results */}
+      {results.length > 0 && (
+        <>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "1rem",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13,
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              {results.length} file{results.length !== 1 ? "s" : ""} processed
+              {successResults.length > 0 &&
+                ` · ${successResults.length} succeeded`}
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              {successResults.length > 0 && (
+                <button
+                  onClick={downloadAll}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "7px 14px",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    fontWeight: 500,
+                  }}
+                >
+                  <i
+                    className="ti ti-download"
+                    style={{ fontSize: 15 }}
+                    aria-hidden="true"
+                  />
+                  Download all ({successResults.length * 2} files)
+                </button>
+              )}
+              <button
+                onClick={() => setResults([])}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 14px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  color: "var(--color-text-secondary)",
+                }}
+              >
+                <i
+                  className="ti ti-trash"
+                  style={{ fontSize: 15 }}
+                  aria-hidden="true"
+                />
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
+          >
+            {results.map((result, i) => (
+              <FileResultCard key={i} result={result} />
+            ))}
+          </div>
+
+          {successResults.length > 0 && (
+            <div
+              style={{
+                marginTop: "1.5rem",
+                padding: "12px 16px",
+                background: "var(--color-background-secondary)",
+                borderRadius: "var(--border-radius-md)",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+              }}
+            >
+              <div style={{ textAlign: "center", padding: "0 1rem" }}>
+                <p
+                  style={{
+                    margin: "0 0 2px",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: "var(--color-text-secondary)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  Text files
+                </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 20,
+                    fontWeight: 500,
+                    color: "var(--color-text-primary)",
+                  }}
+                >
+                  {successResults.length}
+                </p>
+              </div>
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "0 1rem",
+                  borderLeft: "0.5px solid var(--color-border-tertiary)",
+                }}
+              >
+                <p
+                  style={{
+                    margin: "0 0 2px",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: "var(--color-text-secondary)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  SVG files
+                </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 20,
+                    fontWeight: 500,
+                    color: "var(--color-text-primary)",
+                  }}
+                >
+                  {successResults.length}
+                </p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -2,6 +2,10 @@
 
 import type { TransformLog, TransformResult } from "./types";
 
+import { parseStyleString } from "./utils/parseStyleString";
+import { serializeStyleObject } from "./utils/serializeStyleObject";
+import { prettyPrint } from "./utils/prettyPrint";
+
 /** SVG presentation attributes that can be lifted out of style="..." */
 const PROMOTABLE_ATTRS = new Set([
   "fill",
@@ -24,59 +28,6 @@ const PROMOTABLE_ATTRS = new Set([
   "mask",
   "filter",
 ]);
-
-function parseStyleString(style: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  style.split(";").forEach((part) => {
-    const colonIdx = part.indexOf(":");
-    if (colonIdx === -1) return;
-    const key = part.slice(0, colonIdx).trim();
-    const val = part.slice(colonIdx + 1).trim();
-    if (key && val) result[key] = val;
-  });
-  return result;
-}
-
-function serializeStyleObject(obj: Record<string, string>): string {
-  return Object.entries(obj)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join("; ");
-}
-
-function prettyPrint(xml: string): string {
-  let indent = 0;
-  const lines = xml.replace(/>\s*</g, ">\n<").split("\n");
-  return lines
-    .map((raw) => {
-      const line = raw.trim();
-      if (!line) return "";
-
-      // Closing tag — dedent first
-      if (line.startsWith("</")) {
-        indent = Math.max(0, indent - 1);
-        return "  ".repeat(indent) + line;
-      }
-
-      const out = "  ".repeat(indent) + line;
-
-      // Self-closing or inline with content — don't change indent
-      const isSelfClosing =
-        line.endsWith("/>") || /<[^>]+>[^<]+<\/[^>]+>/.test(line);
-      if (
-        !isSelfClosing &&
-        line.startsWith("<") &&
-        !line.startsWith("</") &&
-        !line.startsWith("<?") &&
-        !line.startsWith("<!")
-      ) {
-        indent++;
-      }
-
-      return out;
-    })
-    .filter(Boolean)
-    .join("\n");
-}
 
 export function transformSVG(input: string): TransformResult {
   const log: TransformLog[] = [];
